@@ -1,0 +1,437 @@
+---
+title: "EDSValidation_DataPreparation"
+author: "Jennie An"
+date: "2025-03-18"
+output: html_document
+---
+
+# Preparing the data for the validation of Epic's Sepsis Model
+## Author: C.H.M. Maas
+
+```{r}
+rm(list = ls(all.names = TRUE))
+if(!is.null(dev.list())) dev.off()
+cat('\014')
+```
+
+###libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+Make sure there are three folders: Code, Data, Results to read from and write to
+```{r}
+file.path <- "C:/Users/jenan/OneDrive - Tufts Medicine/code/EDSValidation_Jennie/"
+```
+
+###load data
+
+Predictions (model.score) are generated every 15 minutes
+For negative patients predictions are pulled from admission until discharge
+For positive patients predictions are pulled from admission until sepsis onset
+```{r}
+original.data <- read.csv(paste0(file.path, "Data/SepsisData(X).csv"))
+head(original.data)
+```
+
+
+MRN = patient ID
+CSN = hospitalization ID
+LCSN = Linked CSN, transfers are not considered separate hospitalizations
+```{r}
+colnames(original.data) <- c("MRN", "CSN", "LCSN", "sex", "race", "ethnicity", "age", 
+                             "admission.date.and.time", 
+                             "discharge.date.and.time", "center",
+                             "prediction.date.and.time", "model.score",
+                             "model.prediction", "sep3.time.zero", "sep3.outcome")
+head(original.data)
+```
+
+check for duplicates
+if the sum is zero there is no duplication so no need to adjust
+```{r}
+sum(duplicated(original.data))
+```
+
+###Add columns to data
+
+Separate date and time
+```{r}
+patient.data <- cbind(original.data, 
+                      reshape2::colsplit(original.data$admission.date.and.time, " ", 
+                                         names=c("admission.date", "admission.time")),
+                      reshape2::colsplit(original.data$discharge.date.and.time, " ", 
+                                         names=c("discharge.date", "discharge.time")),
+                      reshape2::colsplit(original.data$prediction.date.and.time, " ", 
+                                         names=c("prediction.date", "prediction.time")))
+head(patient.data)
+```
+
+### Admission inclusion criteria
+
+16 August is the date at which predictions started generating
+```{r}
+cat("Number of patients admitted before 16 August:", sum(patient.data |> 
+                                                           filter(admission.date<"2024-08-16") |> 
+                                                           summarize(unique_ids=n_distinct(LCSN)) |> 
+                                                           pull(unique_ids)), "\n",
+    "Number of patients admitted after 31 October:", sum(patient.data |> 
+                                                             filter(admission.date>"2024-10-31") |> 
+                                                             summarize(unique_ids=n_distinct(LCSN)) |> 
+                                                             pull(unique_ids)), "\n")
+
+patient.data <- patient.data |> 
+  filter(admission.date>="2024-08-16" & admission.date<"2024-11-01")
+cat(" Number of rows:", nrow(patient.data), "\n",
+    "Number of unique hospitalizations:", length(unique(patient.data$LCSN)), "\n",
+    "Number of unique individuals:", length(unique(patient.data$MRN)), "\n")
+```
+
+### Data Manipulations
+
+set time points and maximum time point
+```{r}
+patient.data <- patient.data |> 
+  group_by(LCSN) |> 
+  mutate(time.point=0:(n()-1),
+         max.time.point=max(time.point))
+```
+
+make outcome column time-dependent
+```{r}
+patient.data$time.sep3.outcome <- rep(0, nrow(patient.data))
+patient.data[which(patient.data$time.point==patient.data$max.time.point & 
+                     patient.data$sep3.outcome==1), "time.sep3.outcome"] <- 1
+```
+
+look at a patient without the outcome
+```{r}
+View(patient.data |> filter(MRN==31225483))
+```
+
+look at a patient with the outcome
+```{r}
+View(patient.data |> filter(MRN==31259363))
+```
+
+look at a patient who had two hospitalizations one month apart
+```{r}
+View(patient.data |> filter(MRN==31228576))
+```
+
+look at patient who had transfer
+```{r}
+View(patient.data |> filter(MRN==31819490))
+```
+
+Exclude patients that immediately have the outcome at the first prediction
+```{r}
+cat("There are", sum(patient.data$max.time.point==0 & patient.data$sep3.outcome==1),
+    "(",
+    round(sum(patient.data$max.time.point==0 & patient.data$sep3.outcome==1)/sum(patient.data$time.sep3.outcome==1)*100, 1), 
+    "% of positives)",
+    "patients that experience the outcome immediately at the time of the first prediction.\n")
+patient.data <- patient.data |> filter(!(max.time.point==0 & sep3.outcome==1))
+cat(" Number of rows:", nrow(patient.data), "\n",
+    "Number of unique hospitalizations:", length(unique(patient.data$LCSN)), "\n",
+    "Number of unique individuals:", length(unique(patient.data$MRN)), "\n")
+```
+
+look at patient who had two hospitalizations and the second was immediately sepsis
+```{r}
+View(original.data |> filter(MRN==31235059))
+```
+
+```{r}
+View(patient.data |> filter(MRN==31235059))
+```
+
+check the dates
+```{r}
+cat('Admission dates lie between', 
+    min(patient.data$admission.date), 'and', 
+    max(patient.data$admission.date), '\n',
+    'Discharge dates lie between', 
+    min(patient.data$discharge.date), 'and', 
+    max(patient.data$discharge.date), '\n',
+    'Prediction dates lie between', 
+    min(patient.data$prediction.date), 'and', 
+    max(patient.data$prediction.date), '\n')
+```
+
+Check that full hospitalization was recorded for the patient with discharge at 28 January
+```{r}
+View(original.data[which(original.data$MRN=="34145872"),])
+```
+
+Check the hospitalization of the patient with prediction date at 21 January
+```{r}
+View(original.data[which(original.data$MRN=="35471981"), ])
+```
+
+Make predictions between 0 and 100
+```{r}
+patient.data$model.score <- patient.data$model.score/100
+```
+
+Group Center
+```{r}
+patient.data$center.grouped <- ifelse(patient.data$center=="LOWELL GENERAL HOSPITAL MAIN CAMPUS" | patient.data$center=="LOWELL GENERAL HOSPITAL SAINTS CAMPUS", "Lowell",
+                                       ifelse(patient.data$center=="MELROSE WAKEFIELD HOSPITAL", "Melrose",
+                                              ifelse(patient.data$center=="TUFTS MEDICAL CENTER", "Tufts",
+                                                     ifelse(patient.data$center=="HHF HSPC High Pointe House" | patient.data$center=="LAWRENCE MEMORIAL HOSPITAL", "Other", NA))))
+```
+
+N/A Sex
+```{r}
+patient.data <- patient.data |> mutate(sex = na_if(sex, "Unknown"),
+                                         sex = na_if(sex, "X"),
+                                         sex = na_if(sex, "Nonbinary"))
+```
+
+Rename Race
+```{r}
+patient.data$race.groups <- ifelse(patient.data$race=="White", "White",
+                                   ifelse(patient.data$race=="Asian", "Asian",
+                                          ifelse(patient.data$race=="Black or African American", "Black",
+                                                 ifelse(patient.data$race=="Other" | 
+                                                          patient.data$race=="American Indian or Alaska Native" | 
+                                                          patient.data$race=="Native Hawaiian / Pacific Islander", 
+                                                        "Other", NA))))
+```
+
+Fix acceptable ages
+```{r}
+patient.data <- patient.data |> mutate(age = na_if(age, 125),
+                                       age = na_if(age, 124))
+```
+
+create age groups
+```{r}
+quantiles.age <- quantile(aggregate(patient.data |> select(age), 
+                                    list(patient.data$LCSN), 
+                                    max)[, "age"], na.rm=TRUE)
+young.age <- quantiles.age[2]
+old.age <- quantiles.age[4]
+patient.data$age.groups <- rep(paste("Between", young.age, "and",
+                                      old.age, "years"), 
+                               nrow(patient.data))
+patient.data$age.groups <- ifelse(patient.data$age<young.age, 
+                                  paste("Younger than", young.age, "years"),
+                                   ifelse(patient.data$age>old.age, 
+                                          paste("Older than", old.age, "years"),
+                                          ifelse(is.na(patient.data$age), NA, 
+                                                 paste("Between", young.age, "and", old.age, "years"))))
+head(patient.data)
+```
+
+### Data Checks
+
+for all patients, check admission time and first prediction
+```{r}
+first.prediction <- original.data |> 
+  group_by(LCSN) |> 
+  slice(1) |> 
+  filter(admission.date.and.time>"2024-08-16" & admission.date.and.time<"2024-09-30") |>
+  select(admission.date.and.time, prediction.date.and.time)
+diff.admission.first.prediction <- as.numeric(difftime(first.prediction$prediction.date.and.time,
+                                                       first.prediction$admission.date.and.time,
+                                                      units="hours"))
+hist(diff.admission.first.prediction, xlab="Time in hours", 
+     main="Histogram of time between admission and first prediction")
+```
+
+investigate maximum time between admission and first prediction
+```{r}
+max.ID.admission <- as.numeric(first.prediction[which(diff.admission.first.prediction==max(diff.admission.first.prediction)), "LCSN"])
+cat("Maximum time between admission and first prediction is", 
+    round(max(diff.admission.first.prediction), 1), "hours \n")
+View(original.data |> filter(LCSN==max.ID.admission) |>
+      select(MRN, CSN, LCSN, admission.date.and.time, prediction.date.and.time))
+```
+
+for negatives, check the time between last prediction and discharge
+```{r}
+df.negatives <- patient.data |> filter(sep3.time.zero=="NULL" & time.point==max.time.point)
+diff.discharge.last.prediction <- as.numeric(difftime(df.negatives$discharge.date.and.time, 
+                                                      df.negatives$prediction.date.and.time,
+                                                      units="hours"))
+hist(diff.discharge.last.prediction, xlab="Time in hours", 
+     main="Histogram of time between last prediction and discharge")
+```
+
+investigate maximum time between last prediction and discharge
+```{r}
+max.ID.discharge <- as.numeric(df.negatives[which(diff.discharge.last.prediction==max(diff.discharge.last.prediction)), "LCSN"])
+cat("Maximum time between last prediction and discharge is", 
+    round(max(diff.discharge.last.prediction), 1), "hours \n")
+View(original.data |> filter(LCSN==max.ID.discharge) |>
+        select(MRN, CSN, LCSN, discharge.date.and.time, prediction.date.and.time))
+```
+
+for positives, check the time between last prediction and sepsis outcome
+```{r}
+df.positives <- patient.data |> filter(time.sep3.outcome==1)
+diff.outcome.last.prediction <- as.numeric(difftime(df.positives$sep3.time.zero, 
+                                                    df.positives$prediction.date.and.time,
+                                                    units="hours"))
+hist(diff.outcome.last.prediction, xlab="Time in hours", 
+     main="Histogram of time between last prediction and outcome")
+```
+
+investigate maximum time between last prediction and sepsis outcome
+```{r}
+max.ID.outcome <- as.numeric(df.positives[which(diff.outcome.last.prediction==max(diff.outcome.last.prediction)), "LCSN"])
+cat("Maximum time between last prediction and sepsis outcome is", 
+    round(max(diff.outcome.last.prediction), 1), "hours \n")
+View(original.data |> filter(LCSN==max.ID.outcome) |>
+        select(MRN, CSN, LCSN, sep3.time.zero, prediction.date.and.time))
+```
+
+missing predictions
+```{r}
+cat(" For", sum(diff.admission.first.prediction>2), "(",
+    round(sum(diff.admission.first.prediction>2)/length(unique(patient.data$LCSN))*100, 1), "%)",
+    "patients the time between admission and their first prediction is more than 2 hours. \n",
+    "For", sum(diff.discharge.last.prediction>1), "(",
+    round(sum(diff.discharge.last.prediction>1)/nrow(df.negatives)*100, 1), "%)",
+    "negative patients the time between discharge and the last prediction is more than 1 hour. \n",
+    "For", sum(diff.outcome.last.prediction>1), "(",  
+    round(sum(diff.outcome.last.prediction>1)/nrow(df.positives)*100, 1), "%)",
+    "positive patients the time between sepsis and the last prediction is more than 1 hour. \n")
+```
+
+exclude patients with missing predictions
+```{r}
+IDs <- c(c(first.prediction[diff.admission.first.prediction>2,"LCSN"])$LCSN,
+         c(df.positives[diff.outcome.last.prediction>1, "LCSN"])$LCSN,
+         c(df.negatives[diff.discharge.last.prediction>1, "LCSN"])$LCSN)
+patient.data <- patient.data |> filter(!(LCSN %in% IDs))
+cat(" Number of rows:", nrow(patient.data), "\n",
+    "Number of unique hospitalizations:", length(unique(patient.data$LCSN)), "\n",
+    "Number of unique individuals:", length(unique(patient.data$MRN)), "\n")
+```
+
+### INVESTIGATE HOSPITALIZATION TIME
+
+```{r}
+times <- patient.data |> filter(max.time.point==time.point) |> 
+  select(admission.date.and.time,
+         discharge.date.and.time,
+         time.sep3.outcome) |>
+  mutate(hosp.time=as.numeric(difftime(discharge.date.and.time,
+                                       admission.date.and.time,
+                                       units="hours")))
+hist(times$hosp.time, 
+     xlab="Time in hours", ylab="Frequency", breaks=500, 
+     main="Time of hospitalization")
+```
+
+report hospitalization time
+```{r}
+cat(" Number of rows:", nrow(patient.data), "\n",
+    "Number of unique hospitalizations:", length(unique(patient.data$LCSN)), "\n",
+    "Number of unique individuals:", length(unique(patient.data$MRN)), "\n",
+    "Average time of hospitalization:", round(mean(times$hosp.time), 1), "hours \n",
+    "Average time of hospitalization for negative patients:", 
+    round(mean(times$hosp.time[times$time.sep3.outcome==0]), 1), "hours \n",
+    "Average time of hospitalization for positive patients:", 
+    round(mean(times$hosp.time[times$time.sep3.outcome==1])/24, 1), "days \n",
+    "Median time of hospitalization:", round(median(times$hosp.time), 1), "hours \n",
+    "Median time of hospitalization for negative patients:", 
+    round(median(times$hosp.time[times$time.sep3.outcome==0]), 1), "hours \n",
+    "Median time of hospitalization for positive patients:", 
+    round(median(times$hosp.time[times$time.sep3.outcome==1])/24, 1), "days \n",
+    "Maximum time of hospitalization for positive patients:", 
+    round(max(times$hosp.time[times$time.sep3.outcome==1])/24, 1), "days \n")
+```
+
+```{r}
+# add IQR
+cat(
+  "Number of rows:", nrow(patient.data), "\n",
+  "Number of unique hospitalizations:", length(unique(patient.data$LCSN)), "\n",
+  "Number of unique individuals:", length(unique(patient.data$MRN)), "\n",
+  "Average time of hospitalization:", round(mean(times$hosp.time), 1), "hours \n",
+  "Average time of hospitalization for negative patients:", 
+  round(mean(times$hosp.time[times$time.sep3.outcome==0]), 1), "hours \n",
+  "Average time of hospitalization for positive patients:", 
+  round(mean(times$hosp.time[times$time.sep3.outcome==1])/24, 1), "days \n",
+  "Median time of hospitalization:", round(median(times$hosp.time), 1), "hours \n",
+  "Q1-Q3 of hospitalization time:", 
+  paste0(round(quantile(times$hosp.time, 0.25), 1), "-", 
+         round(quantile(times$hosp.time, 0.75), 1)), " hours \n",
+  "Median time of hospitalization for negative patients:", 
+  round(median(times$hosp.time[times$time.sep3.outcome==0]), 1), "hours \n",
+  "Q1-Q3 for negative patients:", 
+  paste0(round(quantile(times$hosp.time[times$time.sep3.outcome==0], 0.25), 1), "-",
+         round(quantile(times$hosp.time[times$time.sep3.outcome==0], 0.75), 1)), " hours \n",
+  "Median time of hospitalization for positive patients:", 
+  round(median(times$hosp.time[times$time.sep3.outcome==1])/24, 1), "days \n",
+  "Q1-Q3 for positive patients:", 
+  paste0(round(quantile(times$hosp.time[times$time.sep3.outcome==1], 0.25)/24, 1), "-",
+         round(quantile(times$hosp.time[times$time.sep3.outcome==1], 0.75)/24, 1)), " days \n",
+  "Maximum time of hospitalization for positive patients:", 
+  round(max(times$hosp.time[times$time.sep3.outcome==1])/24, 1), "days \n"
+)
+```
+
+prevalence of sepsis
+```{r}
+times.sepsis <- patient.data |> filter(time.sep3.outcome==1) |>
+  pull(max.time.point)/4/24
+N.positives <- length(times.sepsis)
+hist(times.sepsis, 
+     xlab="Time in days", ylab="Frequency", breaks=500, 
+     main="Times at which sepsis occurred")
+cases.sepsis <- data.frame(times=c("0-12", "12-24", 
+                                   "second day",
+                                   "third day", 
+                                   "fourth day",
+                                   "fifth day", 
+                                   "sixth day",
+                                   "more than six days"),
+                           N=c(sum(times.sepsis<0.5),
+                               sum(times.sepsis>=0.5 & times.sepsis<1),
+                               sum(times.sepsis>=1 & times.sepsis<2),
+                               sum(times.sepsis>=2 & times.sepsis<3),
+                               sum(times.sepsis>=3 & times.sepsis<4),
+                               sum(times.sepsis>=4 & times.sepsis<5),
+                               sum(times.sepsis>=5 & times.sepsis<6),
+                               sum(times.sepsis>=6)),
+                           perc=c(round(sum(times.sepsis<0.5)/N.positives*100, 1),
+                                  round(sum(times.sepsis>=0.5 & times.sepsis<1)/N.positives*100, 1),
+                                  round(sum(times.sepsis>=1 & times.sepsis<2)/N.positives*100, 1),
+                                  round(sum(times.sepsis>=2 & times.sepsis<3)/N.positives*100, 1),
+                                  round(sum(times.sepsis>=3 & times.sepsis<4)/N.positives*100, 1),
+                                  round(sum(times.sepsis>=4 & times.sepsis<5)/N.positives*100, 1),
+                                  round(sum(times.sepsis>=5 & times.sepsis<6)/N.positives*100, 1),
+                                  round(sum(times.sepsis>=6)/N.positives*100, 1)))
+```
+
+```{r}
+cases.sepsis
+```
+
+save
+```{r}
+openxlsx::write.xlsx(data.frame(cases.sepsis), 
+           paste0(file.path, "Results/Cases sepsis.xlsx"), 
+           rowNames=FALSE)
+
+save(young.age, old.age, patient.data, file=paste0(file.path, "Data/patient.data.RData"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
