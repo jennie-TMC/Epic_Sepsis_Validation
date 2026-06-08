@@ -14,6 +14,12 @@ if(!is.null(dev.list())) dev.off()
 cat('\014')
 ```
 
+```{r}
+# install.packages("ggplot2")
+#install.packages("reshape2")
+#install.packages("openxlsx")
+```
+
 ###libraries
 ```{r}
 library(dplyr)

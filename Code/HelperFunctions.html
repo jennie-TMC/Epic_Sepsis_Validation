@@ -387,7 +387,7 @@ display: none;
               classified.positive=classified.positive,
               classified.negative=classified.negative))
 }</code></pre>
-<pre class="r"><code>measures.with.CI &lt;- function(predictions=NULL, labels=NULL, nboot=1,
+<pre class="r"><code>measures.with.CI &lt;- function(predictions=NULL, labels=NULL, nboot=100,
                              N.measures=200, min.pred=0){
   # calculate measures on original data set
   original &lt;- measures(predictions=predictions, labels=labels,
@@ -453,9 +453,9 @@ display: none;
   plot(measures$SENS~measures$cutoffs, type=&quot;l&quot;,
        xlab=&quot;&quot;, xlim=c(min.pred, 1),
        ylab=&quot;Sensitivity&quot;, ylim=c(0, 1), axes=FALSE)
-  abline(h=seq(min.pred, 1, 0.125), lty=1, col= gray(0.5, alpha=0.4))
-  abline(v=seq(min.pred, 1, 0.125), lty=1, col= gray(0.5, alpha=0.4))
-  rect(threshold, 0, 1, 1, col=gray(0.8, alpha=0.4), border=NA)
+  abline(h=seq(min.pred, 1, 0.125), lty=1, col=&quot;grey&quot;)
+  abline(v=seq(min.pred, 1, 0.125), lty=1, col=&quot;grey&quot;)
+  rect(threshold, 0, 1, 1, col=rgb(1.0, 0, 0, alpha=0.2), border=NA)
   polygon(x=c(measures$cutoffs, rev(measures$cutoffs)),
           y=c(measures$SENS.upper, rev(measures$SENS.lower)),
           col=gray(0.5, alpha=0.4), border=NA)
@@ -468,9 +468,9 @@ display: none;
   plot(measures$SPEC~measures$cutoffs, type=&quot;l&quot;,
        xlab=&quot;&quot;, xlim=c(min.pred, 1),
        ylab=&quot;Specificity&quot;, ylim=c(0, 1), axes=FALSE)
-  abline(h=seq(min.pred, 1, 0.125), lty=1, col=gray(0.5, alpha=0.4))
-  abline(v=seq(min.pred, 1, 0.125), lty=1, col=gray(0.5, alpha=0.4))
-  rect(threshold, 0, 1, 1, col=gray(0.8, alpha=0.4), border=NA)
+  abline(h=seq(min.pred, 1, 0.125), lty=1, col=&quot;grey&quot;)
+  abline(v=seq(min.pred, 1, 0.125), lty=1, col=&quot;grey&quot;)
+  rect(threshold, 0, 1, 1, col=rgb(1.0, 0, 0, alpha=0.2), border=NA)
   polygon(x=c(measures$cutoffs, rev(measures$cutoffs)),
           y=c(measures$SPEC.upper, rev(measures$SPEC.lower)),
           col=gray(0.5, alpha=0.4), border=NA)
@@ -485,13 +485,13 @@ display: none;
        ylab=&quot;PPV&quot;, ylim=c(0, 1), axes=FALSE)
   polygon(x=c(measures$cutoffs, rev(measures$cutoffs)),
           y=c(measures$pred.pos, rep(0, length(measures$pred.pos))),
-          col=gray(0.2, alpha=0.4), border=NA)
-  abline(h=seq(min.pred, 1, 0.125), lty=1, col=gray(0.5, alpha=0.4))
-  abline(v=seq(min.pred, 1, 0.125), lty=1, col=gray(0.5, alpha=0.4))
-  rect(threshold, 0, 1, 1, col=gray(0.8, alpha=0.4), border=NA)
+          col=rgb(0, 1.0, 0, alpha=0.4), border=NA)
+  abline(h=seq(min.pred, 1, 0.125), lty=1, col=&quot;grey&quot;)
+  abline(v=seq(min.pred, 1, 0.125), lty=1, col=&quot;grey&quot;)
+  rect(threshold, 0, 1, 1, col=rgb(1.0, 0, 0, alpha=0.2), border=NA)
   polygon(x=c(measures$cutoffs, rev(measures$cutoffs)),
           y=c(measures$PPV.upper, rev(measures$PPV.lower)),
-          col=gray(0.5, alpha=0.4), border=NA)
+          col=gray(0.2, alpha=0.4), border=NA)
   lines(measures$cutoffs, measures$PPV, lwd=2)
   axis(side=1, at=seq(min.pred, 1, 0.125), labels=seq(min.pred*100, 100, 12.5)) # x-axis
   axis(side=2, at=seq(0, 1, 0.125), labels=seq(0, 100, 12.5))
@@ -503,13 +503,13 @@ display: none;
        ylab=&quot;NPV&quot;, ylim=c(0, 1), axes=FALSE)
   polygon(x=c(measures$cutoffs, rev(measures$cutoffs)),
           y=c(measures$pred.neg, rep(0, length(measures$pred.neg))),
-          col=gray(0.2, alpha=0.4), border=NA)
-  abline(h=seq(min.pred, 1, 0.125), lty=1, col=gray(0.5, alpha=0.4))
-  abline(v=seq(min.pred, 1, 0.125), lty=1, col=gray(0.5, alpha=0.4))
-  rect(threshold, 0, 1, 1, col=gray(0.8, alpha=0.4), border=NA)
+          col=rgb(0, 1.0, 0, alpha=0.4), border=NA)
+  abline(h=seq(min.pred, 1, 0.125), lty=1, col=&quot;grey&quot;)
+  abline(v=seq(min.pred, 1, 0.125), lty=1, col=&quot;grey&quot;)
+  rect(threshold, 0, 1, 1, col=rgb(1.0, 0, 0, alpha=0.2), border=NA)
   polygon(x=c(measures$cutoffs, rev(measures$cutoffs)),
           y=c(measures$NPV.upper, rev(measures$NPV.lower)),
-          col=gray(0.5, alpha=0.4), border=NA)
+          col=gray(0.2, alpha=0.4), border=NA)
   lines(measures$cutoffs, measures$NPV, lwd=2)
   axis(side=1, at=seq(min.pred, 1, 0.125), labels=seq(min.pred*100, 100, 12.5)) # x-axis
   axis(side=2, at=seq(0, 1, 0.125), labels=seq(0, 100, 12.5))

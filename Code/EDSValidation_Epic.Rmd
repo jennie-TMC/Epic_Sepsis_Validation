@@ -5,7 +5,7 @@ date: "2025-03-19"
 output: html_document
 ---
 
-#Validation of Epic's Sepsis Model using Epic's 8-hour time window
+#Validation of Epic's Sepsis Model using Epic's 8-hour time window, 4, 12, and 24
 ## Author: C.H.M. Maas
 
 clean environment
@@ -13,6 +13,15 @@ clean environment
 rm(list = ls(all.names = TRUE))
 if(!is.null(dev.list())) dev.off()
 cat('\014')
+```
+
+```{r}
+#install.packages("remotes")
+```
+
+
+```{r}
+time_horizon = 8
 ```
 
 Make sure there are three folders: Code, Data, Results to read from and write to
@@ -36,7 +45,7 @@ rmarkdown::render(paste0(file.path, "Code/HelperFunctions.Rmd"))
 ### Load data
 
 ```{r}
-load(paste0(file.path, "Data/patient.data.RData"))
+load(paste0(file.path, "Data/no.exclusions.patient.data.RData"))
 ```
 
 ### Sensitivity Analysis: Sepsis-free Survival
@@ -47,28 +56,28 @@ load(paste0(file.path, "Data/patient.data.RData"))
 #   filter(time.point >= 12*4)
 ```
 
-8-hour time window for patients with the outcome
+X-hour time window for patients with the outcome
 Negative patients: full hospitalization
-Positive patients: only those predictions 8 hours before sepsis onset
+Positive patients: only those predictions X hours before sepsis onset
 ```{r}
-patient.data.8h <- patient.data |> 
+patient.data.Xh <- patient.data |> 
   group_by(LCSN) |> 
-  filter(sep3.outcome==0 | (sep3.outcome==1 & time.point >= max.time.point - 8*4))
+  filter(sep3.outcome==0 | (sep3.outcome==1 & time.point >= max.time.point - time_horizon*4))
 ```
 
 look at a patient without the outcome
 ```{r}
-View(patient.data.8h |> filter(MRN==31226594))
+#View(patient.data.Xh |> filter(MRN==31226594))
 ```
 
 look at a patient with the outcome
 ```{r}
-View(patient.data.8h |> filter(MRN==31252158))
+#View(patient.data.Xh |> filter(MRN==31252158))
 ```
 
 Aggregate data
 ```{r}
-aggregated.data <- aggregate(patient.data.8h, list(patient.data.8h$LCSN), max)
+aggregated.data <- aggregate(patient.data.Xh, list(patient.data.Xh$LCSN), max)
 ```
 
 ###Descriptive statistics
@@ -104,8 +113,8 @@ cat("Number of unknown race:", sum(is.na(aggregated.data$race.groups)), "\n")
 
 report outcomes
 ```{r}
-cat("Number of events", sum(patient.data.8h$time.sep3.outcome), "(", 
-    round(sum(patient.data.8h$time.sep3.outcome)/nrow(aggregated.data)*100, 1), "%) \n")
+cat("Number of events", sum(patient.data.Xh$time.sep3.outcome), "(", 
+    round(sum(patient.data.Xh$time.sep3.outcome)/nrow(aggregated.data)*100, 1), "%) \n")
 hist(patient.data$model.score/100, xlab="Risk score", 
      main="Histogram of risk scores of full data set")
 hist(aggregated.data$model.score, xlab="Risk score", 
@@ -117,7 +126,7 @@ calculate lead time: time from alarm until sepsis onset
 obtain times at which outcomes occur
 results in dataframe with one row per hospitalization and time at which sepsis occurred
 ```{r}
-outcomes <- patient.data.8h[patient.data.8h$time.sep3.outcome==1, 
+outcomes <- patient.data.Xh[patient.data.Xh$time.sep3.outcome==1, 
                             c("LCSN", "time.point")]
 ```
 
@@ -129,7 +138,7 @@ table.lead.times.selected <- c()
 # calculate lead time in hours for different thresholds
 for (try.threshold in threshold.range){
   # indicate when alarm went off by new variable 'alarm'
-  patient.data.lead.time <- patient.data.8h |> 
+  patient.data.lead.time <- patient.data.Xh |> 
     group_by(LCSN) |> 
     mutate(alarm=as.numeric(model.score>try.threshold/100))
   
@@ -155,7 +164,7 @@ for (try.threshold in threshold.range){
   # plot median lead times
   plot.lead.times <- c(plot.lead.times, median(lead.times)) 
   
-  if (try.threshold==25 | try.threshold==28 | try.threshold==30 | try.threshold==32){
+  if (try.threshold==20 | try.threshold==25 | try.threshold==30) {
     table.lead.times.selected <- cbind(table.lead.times.selected,
                                        c(try.threshold,
                                          median(lead.times),
@@ -176,7 +185,7 @@ table.lead.times.selected <- c()
 # calculate lead time in hours for different thresholds
 for (try.threshold in threshold.range) {
   # indicate when alarm went off by new variable 'alarm'
-  patient.data.lead.time <- patient.data.8h |> 
+  patient.data.lead.time <- patient.data.Xh |> 
     group_by(LCSN) |> 
     mutate(alarm = as.numeric(model.score > try.threshold / 100))
   
@@ -204,7 +213,7 @@ for (try.threshold in threshold.range) {
   lead.times.q1 <- c(lead.times.q1, quantile(lead.times, 0.25))
   lead.times.q3 <- c(lead.times.q3, quantile(lead.times, 0.75))
   
-  if (try.threshold %in% c(25, 28, 30, 32)) {
+  if (try.threshold %in% c(20, 25, 30)) {
     table.lead.times.selected <- cbind(
       table.lead.times.selected,
       c(try.threshold,
@@ -278,16 +287,13 @@ ggsave(filename = paste0(file.path, "Results/Lead times.png"),
 report median lead time at a threshold of 25
 ```{r}
 cat(" Median lead time at threshold of 25 is", 
-    as.numeric(table.lead.times |> filter(threshold==25) |> select(lead.time)), 
+    as.numeric(table.lead.times |> filter(threshold==20) |> select(lead.time)), 
     "hours. \n",
     "Median lead time at threshold of 28 is", 
-    as.numeric(table.lead.times |> filter(threshold==28) |> select(lead.time)), 
+    as.numeric(table.lead.times |> filter(threshold==25) |> select(lead.time)), 
     "hours. \n",
     "Median lead time at threshold of 30 is", 
     as.numeric(table.lead.times |> filter(threshold==30) |> select(lead.time)), 
-    "hours. \n",
-    "Median lead time at threshold of 32 is", 
-    as.numeric(table.lead.times |> filter(threshold==32) |> select(lead.time)), 
     "hours. \n")
 ```
 
@@ -303,7 +309,7 @@ grDevices::dev.off()
 
 Obtain results for 4 different thresholds
 ```{r}
-final.thresholds <- c(25, 28, 30, 32)
+final.thresholds <- c(25) #c(20, 25, 30)
 alarm.fatigue <- c()
 compare.thresholds <- c()
 compare.thresholds.Tufts <- c()
@@ -312,7 +318,7 @@ for (final.threshold in final.thresholds){
   ### Average number of alarms in September
   ###
   # add alarms to patient data
-  patient.data.alarm.fatigue <- patient.data.8h |> 
+  patient.data.alarm.fatigue <- patient.data.Xh |> 
     group_by(LCSN) |> 
     mutate(alarm=as.numeric(model.score>final.threshold/100))
   
@@ -333,7 +339,7 @@ for (final.threshold in final.thresholds){
   ###
   ### Plot measures for different thresholds
   ###
-  nboot <- 10 # FINAL: nboot = 1000
+  nboot <- 100 # FINAL: nboot = 1000
   measures.table <- data.frame(names=c("n", "p", "sensitivity", "specificity",
                                        "PPV", "NPV", "Events", "Cindex", "Cindex_q1", "Cindex_q3", "Eavg", "E90"))
   subgroups <- c("All",  "Male", "Female", "Tufts", "Melrose", "Lowell",
