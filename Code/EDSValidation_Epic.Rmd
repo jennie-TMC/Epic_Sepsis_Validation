@@ -21,7 +21,7 @@ cat('\014')
 
 
 ```{r}
-time_horizon = 4
+time_horizon = 8
 ```
 
 Make sure there are three folders: Code, Data, Results to read from and write to
@@ -309,7 +309,7 @@ Decision-curve analysis
 
 Obtain results for 4 different thresholds
 ```{r}
-final.thresholds <- c(20, 25, 30)
+final.thresholds <- c(25) #c(20, 25, 30)
 alarm.fatigue <- c()
 compare.thresholds <- c()
 compare.thresholds.Tufts <- c()
@@ -339,7 +339,7 @@ for (final.threshold in final.thresholds){
   ###
   ### Plot measures for different thresholds
   ###
-  nboot <- 500 # FINAL: nboot = 1000
+  nboot <- 1000 # FINAL: nboot = 1000
   measures.table <- data.frame(names=c("n", "p", "sensitivity", "specificity",
                                        "PPV", "NPV", "Events", "Cindex", "Cindex_q1", "Cindex_q3", "Eavg", "E90"))
   subgroups <- c("All",  "Male", "Female", "Tufts", "Melrose", "Lowell",
@@ -365,45 +365,45 @@ for (final.threshold in final.thresholds){
       data.subgroup <- aggregated.data |> filter(race.groups==subgroup)
     }
     
-    # calculate measures
-    # print boostrapping lengths
-    #print(nrow(data.frame(predictions=data.subgroup$model.score, labels=data.subgroup$sep3.outcome)))
+    #calculate measures
+    #print boostrapping lengths
+    # print(nrow(data.frame(predictions=data.subgroup$model.score, labels=data.subgroup$sep3.outcome)))
     measures.CI <- measures.with.CI(predictions=data.subgroup$model.score,
                                     labels=data.subgroup$sep3.outcome,
                                     nboot=nboot,
                                     min.pred=0)
-    # # make a figure of measures
-    # create.figure(measures=measures.CI, 
-    #               threshold=final.threshold/100,
-    #               predictions=data.subgroup$model.score,
-    #               min.pred=0,
-    #               title=subgroup,
-    #               file.path=paste0(file.path, "Results/Threshold ", final.threshold, "/"))
+    # make a figure of measures
+    create.figure(measures=measures.CI,
+                  threshold=final.threshold/100,
+                  predictions=data.subgroup$model.score,
+                  min.pred=0,
+                  title=subgroup,
+                  file.path=paste0(file.path, "Results/Threshold ", final.threshold, "/"))
     
     # # calibration plot
     calibrated.predictions <- glm(sep3.outcome ~ model.score,
                                   data=data.subgroup,
                                   family="binomial")
     lp <- predict(calibrated.predictions)
-    # grDevices::png(file=paste0(file.path, "Results/Threshold ", final.threshold, 
-    #                            "/Calibration ", subgroup, ".png"),
-    #                width=500, height=500, units="px")
+    grDevices::png(file=paste0(file.path, "Results/Threshold ", final.threshold,
+                               "/Calibration ", subgroup, ".png"),
+                   width=500, height=500, units="px")
     val.prob <- PredictionTools::val.prob.mi(lp.mi=lp,
                                              lim=c(0, 0.2),
                                              y=data.subgroup$sep3.outcome,
                                              g=ifelse(subgroup=="All", 10, 5),
                                              main=subgroup, dist=TRUE)
-    # dev.off()
-    # 
-    # # calibration plot using raw scores
-    # if (subgroup=="All"){
-    #   grDevices::png(file=paste0(file.path, "Results/Threshold ", final.threshold, 
-    #                              "/Calibration ", subgroup, " raw scores.png"),
-    #                  width=500, height=500, units="px")
-    #   rms::val.prob(p=data.subgroup$model.score, 
-    #                 y=data.subgroup$sep3.outcome)
-    #   dev.off()
-    # }
+    dev.off()
+
+    # calibration plot using raw scores
+    if (subgroup=="All"){
+      grDevices::png(file=paste0(file.path, "Results/Threshold ", final.threshold,
+                                 "/Calibration ", subgroup, " raw scores.png"),
+                     width=500, height=500, units="px")
+      rms::val.prob(p=data.subgroup$model.score,
+                    y=data.subgroup$sep3.outcome)
+      dev.off()
+    }
     
     # add to table
     measures.table <- cbind(measures.table,
@@ -439,16 +439,16 @@ for (final.threshold in final.thresholds){
 
 save table for alarm fatigue
 ```{r}
-# colnames(alarm.fatigue) <- c("average month", 
-#                              "average month with sepsis", 
-#                              "average month without sepsis", 
-#                              "average day", 
-#                              "average day with sepsis", 
-#                              "average day without sepsis")
-# rownames(alarm.fatigue) <- final.thresholds
-# openxlsx::write.xlsx(data.frame(alarm.fatigue), 
-#                      rowNames=TRUE,
-#                      file=paste0(file.path, "Results/Alarm Fatigue.xlsx"))
+colnames(alarm.fatigue) <- c("average month",
+                             "average month with sepsis",
+                             "average month without sepsis",
+                             "average day",
+                             "average day with sepsis",
+                             "average day without sepsis")
+rownames(alarm.fatigue) <- final.thresholds
+openxlsx::write.xlsx(data.frame(alarm.fatigue),
+                     rowNames=TRUE,
+                     file=paste0(file.path, "Results/Alarm Fatigue.xlsx"))
 ```
 
 save table comparing thresholds for all patients

@@ -387,7 +387,7 @@ display: none;
               classified.positive=classified.positive,
               classified.negative=classified.negative))
 }</code></pre>
-<pre class="r"><code>measures.with.CI &lt;- function(predictions=NULL, labels=NULL, nboot=100,
+<pre class="r"><code>measures.with.CI &lt;- function(predictions=NULL, labels=NULL, nboot=1000,
                              N.measures=200, min.pred=0){
   # calculate measures on original data set
   original &lt;- measures(predictions=predictions, labels=labels,

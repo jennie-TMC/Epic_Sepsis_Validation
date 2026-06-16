@@ -39,7 +39,7 @@ measures <- function(predictions=NULL, labels=NULL, N.measures=200, min.pred=0){
 ```
 
 ```{r}
-measures.with.CI <- function(predictions=NULL, labels=NULL, nboot=100,
+measures.with.CI <- function(predictions=NULL, labels=NULL, nboot=1000,
                              N.measures=200, min.pred=0){
   # calculate measures on original data set
   original <- measures(predictions=predictions, labels=labels,
