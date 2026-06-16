@@ -403,7 +403,9 @@ display: none;
   NPV.boot &lt;- matrix(NA, N.measures, nboot)
   for (n in 1:nboot){
     # take a bootstrap sample of predictions and labels
-    bootstrapped.df &lt;- df[sample(1:N, replace=TRUE),]
+    #bootstrapped.df &lt;- df[sample(1:N, replace=TRUE),]
+    # modification bootstrap by hospitalization
+    bootstrapped.df &lt;- df[df$LCSN %in% sample(unique(df$LCSN), replace=TRUE), ]
     
     # calculate measures on bootstrap samples
     boot.measures &lt;- measures(predictions = bootstrapped.df$predictions,

@@ -55,7 +55,9 @@ measures.with.CI <- function(predictions=NULL, labels=NULL, nboot=100,
   NPV.boot <- matrix(NA, N.measures, nboot)
   for (n in 1:nboot){
     # take a bootstrap sample of predictions and labels
-    bootstrapped.df <- df[sample(1:N, replace=TRUE),]
+    #bootstrapped.df <- df[sample(1:N, replace=TRUE),]
+    # modification bootstrap by hospitalization
+    bootstrapped.df <- df[df$LCSN %in% sample(unique(df$LCSN), replace=TRUE), ]
     
     # calculate measures on bootstrap samples
     boot.measures <- measures(predictions = bootstrapped.df$predictions,
