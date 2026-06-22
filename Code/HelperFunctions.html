@@ -387,7 +387,7 @@ display: none;
               classified.positive=classified.positive,
               classified.negative=classified.negative))
 }</code></pre>
-<pre class="r"><code>measures.with.CI &lt;- function(predictions=NULL, labels=NULL, nboot=1000,
+<pre class="r"><code>measures.with.CI &lt;- function(id = NULL, predictions=NULL, labels=NULL, nboot=500,
                              N.measures=200, min.pred=0){
   # calculate measures on original data set
   original &lt;- measures(predictions=predictions, labels=labels,
@@ -395,7 +395,7 @@ display: none;
   N.measures &lt;- length(original$SENS)
   
   # initialize data
-  df &lt;- data.frame(predictions=predictions, labels=labels)
+  df &lt;- data.frame(id = id, predictions=predictions, labels=labels)
   N &lt;- nrow(df)
   SENS.boot &lt;- matrix(NA, N.measures, nboot)
   SPEC.boot &lt;- matrix(NA, N.measures, nboot)
@@ -405,7 +405,7 @@ display: none;
     # take a bootstrap sample of predictions and labels
     #bootstrapped.df &lt;- df[sample(1:N, replace=TRUE),]
     # modification bootstrap by hospitalization
-    bootstrapped.df &lt;- df[df$LCSN %in% sample(unique(df$LCSN), replace=TRUE), ]
+    bootstrapped.df &lt;-  df[df$id %in% sample(unique(df$id), replace=TRUE), ]
     
     # calculate measures on bootstrap samples
     boot.measures &lt;- measures(predictions = bootstrapped.df$predictions,

@@ -3,6 +3,8 @@
 .RData
 .Ruserdata
 Data/
+Patient Level Analysis/
+Old/
 .RDataTmp
 EDSValidation.Rproj
 Code/Time Dependent Analysis/Old

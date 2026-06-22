@@ -39,7 +39,7 @@ measures <- function(predictions=NULL, labels=NULL, N.measures=200, min.pred=0){
 ```
 
 ```{r}
-measures.with.CI <- function(predictions=NULL, labels=NULL, nboot=1000,
+measures.with.CI <- function(id = NULL, predictions=NULL, labels=NULL, nboot=500,
                              N.measures=200, min.pred=0){
   # calculate measures on original data set
   original <- measures(predictions=predictions, labels=labels,
@@ -47,7 +47,7 @@ measures.with.CI <- function(predictions=NULL, labels=NULL, nboot=1000,
   N.measures <- length(original$SENS)
   
   # initialize data
-  df <- data.frame(predictions=predictions, labels=labels)
+  df <- data.frame(id = id, predictions=predictions, labels=labels)
   N <- nrow(df)
   SENS.boot <- matrix(NA, N.measures, nboot)
   SPEC.boot <- matrix(NA, N.measures, nboot)
@@ -57,7 +57,7 @@ measures.with.CI <- function(predictions=NULL, labels=NULL, nboot=1000,
     # take a bootstrap sample of predictions and labels
     #bootstrapped.df <- df[sample(1:N, replace=TRUE),]
     # modification bootstrap by hospitalization
-    bootstrapped.df <- df[df$LCSN %in% sample(unique(df$LCSN), replace=TRUE), ]
+    bootstrapped.df <-  df[df$id %in% sample(unique(df$id), replace=TRUE), ]
     
     # calculate measures on bootstrap samples
     boot.measures <- measures(predictions = bootstrapped.df$predictions,
