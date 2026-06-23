@@ -84,227 +84,227 @@ aggregated.data <- aggregate(patient.data.Xh, list(patient.data.Xh$LCSN), max)
 
 center
 ```{r}
-# aggregated.data$center.grouped <- as.factor(aggregated.data$center.grouped)
-# table(aggregated.data$center.grouped)
-# cat("Number of unknown center:", sum(is.na(aggregated.data$center.grouped)), "\n")
+aggregated.data$center.grouped <- as.factor(aggregated.data$center.grouped)
+table(aggregated.data$center.grouped)
+cat("Number of unknown center:", sum(is.na(aggregated.data$center.grouped)), "\n")
 ```
 
 sex
 ```{r}
-# table(aggregated.data$sex)
-# round(table(aggregated.data$sex)/nrow(aggregated.data)*100, 0)
-# cat("Number of unknown sex:", sum(is.na(aggregated.data$sex)), "\n")
+table(aggregated.data$sex)
+round(table(aggregated.data$sex)/nrow(aggregated.data)*100, 0)
+cat("Number of unknown sex:", sum(is.na(aggregated.data$sex)), "\n")
 ```
 
 age
 ```{r}
-# cat("Maximum age:", max(aggregated.data$age, na.rm=TRUE), "\n")
-# hist(aggregated.data$age, xlab="Age", 
-#      main="Histogram of age (in years)")
-# quantile(aggregated.data$age, na.rm=TRUE)
-# cat("Number of unknown age:", sum(is.na(aggregated.data$age.groups)), "\n")
+cat("Maximum age:", max(aggregated.data$age, na.rm=TRUE), "\n")
+hist(aggregated.data$age, xlab="Age",
+     main="Histogram of age (in years)")
+quantile(aggregated.data$age, na.rm=TRUE)
+cat("Number of unknown age:", sum(is.na(aggregated.data$age.groups)), "\n")
 ```
 
 race
 ```{r}
-# sort(table(aggregated.data$race.groups))
-# cat("Number of unknown race:", sum(is.na(aggregated.data$race.groups)), "\n")
+sort(table(aggregated.data$race.groups))
+cat("Number of unknown race:", sum(is.na(aggregated.data$race.groups)), "\n")
 ```
 
 report outcomes
 ```{r}
-# cat("Number of events", sum(patient.data.Xh$time.sep3.outcome), "(", 
-#     round(sum(patient.data.Xh$time.sep3.outcome)/nrow(aggregated.data)*100, 1), "%) \n")
-# hist(patient.data$model.score/100, xlab="Risk score", 
-#      main="Histogram of risk scores of full data set")
-# hist(aggregated.data$model.score, xlab="Risk score", 
-#      main="Histogram of risk scores of aggregated data set (maximum prediction)")
-# round(quantile(aggregated.data$model.score)*100, 0)
+cat("Number of events", sum(patient.data.Xh$time.sep3.outcome), "(",
+    round(sum(patient.data.Xh$time.sep3.outcome)/nrow(aggregated.data)*100, 1), "%) \n")
+hist(patient.data$model.score/100, xlab="Risk score",
+     main="Histogram of risk scores of full data set")
+hist(aggregated.data$model.score, xlab="Risk score",
+     main="Histogram of risk scores of aggregated data set (maximum prediction)")
+round(quantile(aggregated.data$model.score)*100, 0)
 ```
 
 calculate lead time: time from alarm until sepsis onset
 obtain times at which outcomes occur
 results in dataframe with one row per hospitalization and time at which sepsis occurred
 ```{r}
-# outcomes <- patient.data.Xh[patient.data.Xh$time.sep3.outcome==1,
-#                             c("LCSN", "time.point")]
+outcomes <- patient.data.Xh[patient.data.Xh$time.sep3.outcome==1,
+                            c("LCSN", "time.point")]
 ```
 
 plot median lead time across range of thresholds
 ```{r}
-# plot.lead.times <- c()
-# threshold.range <- 0:80
-# table.lead.times.selected <- c()
-# # calculate lead time in hours for different thresholds
-# for (try.threshold in threshold.range){
-#   # indicate when alarm went off by new variable 'alarm'
-#   patient.data.lead.time <- patient.data.Xh |>
-#     group_by(LCSN) |>
-#     mutate(alarm=as.numeric(model.score>try.threshold/100))
-# 
-#   # at each threshold, select alarms and the time at which that alarm occured
-#   alarms <- patient.data.lead.time[patient.data.lead.time$alarm==1,
-#                                    c("LCSN", "time.point")]
-# 
-#   # at each threshold, select only first alarm and the time at which first alarm occured
-#   first.alarms <- alarms |>
-#     group_by(LCSN) |>
-#     slice(1)
-# 
-#   # join two tables
-#   joined <- right_join(first.alarms, outcomes, by="LCSN")
-#   colnames(joined) <- c("LCSN", "time.first.alarm", "time.outcome")
-# 
-#   # only keep those patients that had an alarm before the outcome
-#   joined <- joined |> filter(!is.na(time.first.alarm))
-# 
-#   # calculate lead times in hours
-#   lead.times <- (joined$time.outcome-joined$time.first.alarm)/4
-# 
-#   # plot median lead times
-#   plot.lead.times <- c(plot.lead.times, median(lead.times))
-# 
-#   if (try.threshold==20 | try.threshold==25 | try.threshold==30) {
-#     table.lead.times.selected <- cbind(table.lead.times.selected,
-#                                        c(try.threshold,
-#                                          median(lead.times),
-#                                          sum(nrow(joined)),
-#                                          sum(nrow(outcomes)-nrow(joined))))
-#   }
-# }
+plot.lead.times <- c()
+threshold.range <- 0:80
+table.lead.times.selected <- c()
+# calculate lead time in hours for different thresholds
+for (try.threshold in threshold.range){
+  # indicate when alarm went off by new variable 'alarm'
+  patient.data.lead.time <- patient.data.Xh |>
+    group_by(LCSN) |>
+    mutate(alarm=as.numeric(model.score>try.threshold/100))
+
+  # at each threshold, select alarms and the time at which that alarm occured
+  alarms <- patient.data.lead.time[patient.data.lead.time$alarm==1,
+                                   c("LCSN", "time.point")]
+
+  # at each threshold, select only first alarm and the time at which first alarm occured
+  first.alarms <- alarms |>
+    group_by(LCSN) |>
+    slice(1)
+
+  # join two tables
+  joined <- right_join(first.alarms, outcomes, by="LCSN")
+  colnames(joined) <- c("LCSN", "time.first.alarm", "time.outcome")
+
+  # only keep those patients that had an alarm before the outcome
+  joined <- joined |> filter(!is.na(time.first.alarm))
+
+  # calculate lead times in hours
+  lead.times <- (joined$time.outcome-joined$time.first.alarm)/4
+
+  # plot median lead times
+  plot.lead.times <- c(plot.lead.times, median(lead.times))
+
+  if (try.threshold==20 | try.threshold==25 | try.threshold==30) {
+    table.lead.times.selected <- cbind(table.lead.times.selected,
+                                       c(try.threshold,
+                                         median(lead.times),
+                                         sum(nrow(joined)),
+                                         sum(nrow(outcomes)-nrow(joined))))
+  }
+}
 ```
 
 ```{r}
-# # with IQR
-# plot.lead.times <- c()
-# lead.times.q1 <- c()
-# lead.times.q3 <- c()
-# threshold.range <- 0:80
-# table.lead.times.selected <- c()
-# 
-# # calculate lead time in hours for different thresholds
-# for (try.threshold in threshold.range) {
-#   # indicate when alarm went off by new variable 'alarm'
-#   patient.data.lead.time <- patient.data.Xh |>
-#     group_by(LCSN) |>
-#     mutate(alarm = as.numeric(model.score > try.threshold / 100))
-# 
-#   # select alarms and the time at which that alarm occurred
-#   alarms <- patient.data.lead.time[patient.data.lead.time$alarm == 1,
-#                                    c("LCSN", "time.point")]
-# 
-#   # select only first alarm for each patient
-#   first.alarms <- alarms |>
-#     group_by(LCSN) |>
-#     slice(1)
-# 
-#   # join with outcomes
-#   joined <- right_join(first.alarms, outcomes, by = "LCSN")
-#   colnames(joined) <- c("LCSN", "time.first.alarm", "time.outcome")
-# 
-#   # keep only patients with an alarm before the outcome
-#   joined <- joined |> filter(!is.na(time.first.alarm))
-# 
-#   # calculate lead times in hours
-#   lead.times <- (joined$time.outcome - joined$time.first.alarm) / 4
-# 
-#   # store median, Q1, and Q3
-#   plot.lead.times <- c(plot.lead.times, median(lead.times))
-#   lead.times.q1 <- c(lead.times.q1, quantile(lead.times, 0.25))
-#   lead.times.q3 <- c(lead.times.q3, quantile(lead.times, 0.75))
-# 
-#   if (try.threshold %in% c(20, 25, 30)) {
-#     table.lead.times.selected <- cbind(
-#       table.lead.times.selected,
-#       c(try.threshold,
-#         median(lead.times),
-#         quantile(lead.times, 0.25),
-#         quantile(lead.times, 0.75),
-#         nrow(joined),
-#         nrow(outcomes) - nrow(joined))
-#     )
-#   }
-# }
-# 
-# # Optionally, name the rows for clarity
-# rownames(table.lead.times.selected) <- c("Threshold", "Median", "Q1", "Q3", "PatientsWithAlarm", "PatientsWithoutAlarm")
+# with IQR
+plot.lead.times <- c()
+lead.times.q1 <- c()
+lead.times.q3 <- c()
+threshold.range <- 0:80
+table.lead.times.selected <- c()
+
+# calculate lead time in hours for different thresholds
+for (try.threshold in threshold.range) {
+  # indicate when alarm went off by new variable 'alarm'
+  patient.data.lead.time <- patient.data.Xh |>
+    group_by(LCSN) |>
+    mutate(alarm = as.numeric(model.score > try.threshold / 100))
+
+  # select alarms and the time at which that alarm occurred
+  alarms <- patient.data.lead.time[patient.data.lead.time$alarm == 1,
+                                   c("LCSN", "time.point")]
+
+  # select only first alarm for each patient
+  first.alarms <- alarms |>
+    group_by(LCSN) |>
+    slice(1)
+
+  # join with outcomes
+  joined <- right_join(first.alarms, outcomes, by = "LCSN")
+  colnames(joined) <- c("LCSN", "time.first.alarm", "time.outcome")
+
+  # keep only patients with an alarm before the outcome
+  joined <- joined |> filter(!is.na(time.first.alarm))
+
+  # calculate lead times in hours
+  lead.times <- (joined$time.outcome - joined$time.first.alarm) / 4
+
+  # store median, Q1, and Q3
+  plot.lead.times <- c(plot.lead.times, median(lead.times))
+  lead.times.q1 <- c(lead.times.q1, quantile(lead.times, 0.25))
+  lead.times.q3 <- c(lead.times.q3, quantile(lead.times, 0.75))
+
+  if (try.threshold %in% c(20, 25, 30)) {
+    table.lead.times.selected <- cbind(
+      table.lead.times.selected,
+      c(try.threshold,
+        median(lead.times),
+        quantile(lead.times, 0.25),
+        quantile(lead.times, 0.75),
+        nrow(joined),
+        nrow(outcomes) - nrow(joined))
+    )
+  }
+}
+
+# Optionally, name the rows for clarity
+rownames(table.lead.times.selected) <- c("Threshold", "Median", "Q1", "Q3", "PatientsWithAlarm", "PatientsWithoutAlarm")
 ```
 
 ```{r}
-# dim(table.lead.times.selected)
+dim(table.lead.times.selected)
 ```
 
 ```{r}
-# table.lead.times <- data.frame(threshold=threshold.range, lead.time=plot.lead.times)
-# rownames(table.lead.times.selected) <- c("Threshold", 
-#                                          "Lead time",
-#                                          "Q1",
-#                                          "Q3",
-#                                          "Number of patients with alarm before sepsis",
-#                                          "Number of patients without alarm before sepsis")
-# openxlsx::write.xlsx(data.frame(table.lead.times.selected), 
-#                      rowNames=TRUE,
-#                      file=paste0(file.path, "Results/Lead times across selected thresholds.xlsx"))
+table.lead.times <- data.frame(threshold=threshold.range, lead.time=plot.lead.times)
+rownames(table.lead.times.selected) <- c("Threshold",
+                                         "Lead time",
+                                         "Q1",
+                                         "Q3",
+                                         "Number of patients with alarm before sepsis",
+                                         "Number of patients without alarm before sepsis")
+openxlsx::write.xlsx(data.frame(table.lead.times.selected),
+                     rowNames=TRUE,
+                     file=paste0(file.path, "Results/Lead times across selected thresholds.xlsx"))
 ```
 
 ```{r}
-# # with IQR
-# # Create full table with median, Q1, and Q3 for all thresholds
-# table.lead.times <- data.frame(
-#   threshold = threshold.range,
-#   lead.time = plot.lead.times,
-#   Q1 = lead.times.q1,
-#   Q3 = lead.times.q3
-# )
-# 
-# # Add Q1 and Q3 to selected thresholds table
-# # Make sure table.lead.times.selected includes median, Q1, Q3, patients with/without alarm
-# table.lead.times.selected <- t(table.lead.times.selected)  # transpose to get thresholds as rows
-# colnames(table.lead.times.selected) <- c("Threshold", "Median", "Q1", "Q3",
-#                                         "PatientsWithAlarm", "PatientsWithoutAlarm")
-# 
-# # Write to Excel
-# openxlsx::write.xlsx(
-#   data.frame(table.lead.times.selected),
-#   rowNames = TRUE,
-#   file = paste0(file.path, "Results/Lead times across selected thresholds with IQR.xlsx")
-# )
+# with IQR
+# Create full table with median, Q1, and Q3 for all thresholds
+table.lead.times <- data.frame(
+  threshold = threshold.range,
+  lead.time = plot.lead.times,
+  Q1 = lead.times.q1,
+  Q3 = lead.times.q3
+)
+
+# Add Q1 and Q3 to selected thresholds table
+# Make sure table.lead.times.selected includes median, Q1, Q3, patients with/without alarm
+table.lead.times.selected <- t(table.lead.times.selected)  # transpose to get thresholds as rows
+colnames(table.lead.times.selected) <- c("Threshold", "Median", "Q1", "Q3",
+                                        "PatientsWithAlarm", "PatientsWithoutAlarm")
+
+# Write to Excel
+openxlsx::write.xlsx(
+  data.frame(table.lead.times.selected),
+  rowNames = TRUE,
+  file = paste0(file.path, "Results/Lead times across selected thresholds with IQR.xlsx")
+)
 ```
 
 ```{r}
-# ggsave(filename = paste0(file.path, "Results/Lead times.png"),
-#        plot = ggplot(table.lead.times,
-#                      aes(x = threshold.range, y = lead.time)) +
-#          geom_line() +
-#          geom_hline(yintercept = 1, color = "red") +
-#          ylim(0, ceiling(max(table.lead.times$lead.time))) +
-#          labs(x = "Threshold", y = "Median lead time") +
-#          theme_bw() +
-#          theme(text=element_text(size=20)),
-#        width = 5, height = 5, units = "in", dpi = 300)
+ggsave(filename = paste0(file.path, "Results/Lead times.png"),
+       plot = ggplot(table.lead.times,
+                     aes(x = threshold.range, y = lead.time)) +
+         geom_line() +
+         geom_hline(yintercept = 1, color = "red") +
+         ylim(0, ceiling(max(table.lead.times$lead.time))) +
+         labs(x = "Threshold", y = "Median lead time") +
+         theme_bw() +
+         theme(text=element_text(size=20)),
+       width = 5, height = 5, units = "in", dpi = 300)
 ```
 
 report median lead time at a threshold of 25
 ```{r}
-# cat(" Median lead time at threshold of 25 is",
-#     as.numeric(table.lead.times |> filter(threshold==20) |> select(lead.time)),
-#     "hours. \n",
-#     "Median lead time at threshold of 28 is",
-#     as.numeric(table.lead.times |> filter(threshold==25) |> select(lead.time)),
-#     "hours. \n",
-#     "Median lead time at threshold of 30 is",
-#     as.numeric(table.lead.times |> filter(threshold==30) |> select(lead.time)),
-#     "hours. \n")
+cat(" Median lead time at threshold of 25 is",
+    as.numeric(table.lead.times |> filter(threshold==20) |> select(lead.time)),
+    "hours. \n",
+    "Median lead time at threshold of 28 is",
+    as.numeric(table.lead.times |> filter(threshold==25) |> select(lead.time)),
+    "hours. \n",
+    "Median lead time at threshold of 30 is",
+    as.numeric(table.lead.times |> filter(threshold==30) |> select(lead.time)),
+    "hours. \n")
 ```
 
 Decision-curve analysis
 ```{r}
-# grDevices::png(file=paste0(file.path, "Results/DCA.png"),
-#                width=500, height=500, units="px")
-# dcurves::dca(sep3.outcome ~ model.score,
-#              data=aggregated.data) |>
-#   plot(smooth=TRUE)
-# grDevices::dev.off()
+grDevices::png(file=paste0(file.path, "Results/DCA.png"),
+               width=500, height=500, units="px")
+dcurves::dca(sep3.outcome ~ model.score,
+             data=aggregated.data) |>
+  plot(smooth=TRUE)
+grDevices::dev.off()
 ```
 
 Obtain results for 4 different thresholds
@@ -328,13 +328,13 @@ for (final.threshold in final.thresholds){
     filter(prediction.date>="2024-09-01" & prediction.date<="2024-09-30")
   
   # report
-  # alarm.fatigue <- rbind(alarm.fatigue,
-  #                        c(sum(Tufts.sep.patients$alarm),
-  #                          sum(Tufts.sep.patients$alarm & Tufts.sep.patients$sep3.outcome==1),
-  #                          sum(Tufts.sep.patients$alarm & Tufts.sep.patients$sep3.outcome==0),
-  #                          round(sum(Tufts.sep.patients$alarm)/30, 0),
-  #                          round(sum(Tufts.sep.patients$alarm & Tufts.sep.patients$sep3.outcome==1)/30, 0),
-  #                          round(sum(Tufts.sep.patients$alarm & Tufts.sep.patients$sep3.outcome==0)/30, 0)))
+  alarm.fatigue <- rbind(alarm.fatigue,
+                         c(sum(Tufts.sep.patients$alarm),
+                           sum(Tufts.sep.patients$alarm & Tufts.sep.patients$sep3.outcome==1),
+                           sum(Tufts.sep.patients$alarm & Tufts.sep.patients$sep3.outcome==0),
+                           round(sum(Tufts.sep.patients$alarm)/30, 0),
+                           round(sum(Tufts.sep.patients$alarm & Tufts.sep.patients$sep3.outcome==1)/30, 0),
+                           round(sum(Tufts.sep.patients$alarm & Tufts.sep.patients$sep3.outcome==0)/30, 0)))
   
   ###
   ### Plot measures for different thresholds
@@ -373,13 +373,13 @@ for (final.threshold in final.thresholds){
                                     labels=data.subgroup$sep3.outcome,
                                     nboot=nboot,
                                     min.pred=0)
-    # # make a figure of measures
-    # create.figure(measures=measures.CI,
-    #               threshold=final.threshold/100,
-    #               predictions=data.subgroup$model.score,
-    #               min.pred=0,
-    #               title=subgroup,
-    #               file.path=paste0(file.path, "Results/Threshold ", final.threshold, "/"))
+    # make a figure of measures
+    create.figure(measures=measures.CI,
+                  threshold=final.threshold/100,
+                  predictions=data.subgroup$model.score,
+                  min.pred=0,
+                  title=subgroup,
+                  file.path=paste0(file.path, "Results/Threshold ", final.threshold, "/"))
     
     # # calibration plot
     calibrated.predictions <- glm(sep3.outcome ~ model.score,
@@ -394,17 +394,17 @@ for (final.threshold in final.thresholds){
                                              y=data.subgroup$sep3.outcome,
                                              g=ifelse(subgroup=="All", 10, 5),
                                              main=subgroup, dist=TRUE)
-    # dev.off()
-    # 
-    # # calibration plot using raw scores
-    # if (subgroup=="All"){
-    #   grDevices::png(file=paste0(file.path, "Results/Threshold ", final.threshold,
-    #                              "/Calibration ", subgroup, " raw scores.png"),
-    #                  width=500, height=500, units="px")
-    #   rms::val.prob(p=data.subgroup$model.score,
-    #                 y=data.subgroup$sep3.outcome)
-    #   dev.off()
-    # }
+    dev.off()
+
+    # calibration plot using raw scores
+    if (subgroup=="All"){
+      grDevices::png(file=paste0(file.path, "Results/Threshold ", final.threshold,
+                                 "/Calibration ", subgroup, " raw scores.png"),
+                     width=500, height=500, units="px")
+      rms::val.prob(p=data.subgroup$model.score,
+                    y=data.subgroup$sep3.outcome)
+      dev.off()
+    }
     
     # add to table
     measures.table <- cbind(measures.table,
@@ -440,16 +440,16 @@ for (final.threshold in final.thresholds){
 
 save table for alarm fatigue
 ```{r}
-# colnames(alarm.fatigue) <- c("average month",
-#                              "average month with sepsis",
-#                              "average month without sepsis",
-#                              "average day",
-#                              "average day with sepsis",
-#                              "average day without sepsis")
-# rownames(alarm.fatigue) <- final.thresholds
-# openxlsx::write.xlsx(data.frame(alarm.fatigue),
-#                      rowNames=TRUE,
-#                      file=paste0(file.path, "Results/Alarm Fatigue.xlsx"))
+colnames(alarm.fatigue) <- c("average month",
+                             "average month with sepsis",
+                             "average month without sepsis",
+                             "average day",
+                             "average day with sepsis",
+                             "average day without sepsis")
+rownames(alarm.fatigue) <- final.thresholds
+openxlsx::write.xlsx(data.frame(alarm.fatigue),
+                     rowNames=TRUE,
+                     file=paste0(file.path, "Results/Alarm Fatigue.xlsx"))
 ```
 
 save table comparing thresholds for all patients
