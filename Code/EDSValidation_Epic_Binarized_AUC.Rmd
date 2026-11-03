@@ -1,0 +1,321 @@
+---
+title: "EDS_Validation_Epic_Binarized_AUC"
+author: "Jennie An"
+date: "2026-09-14"
+output: html_document
+---
+
+#Validation of Epic's Sepsis Model using Epic's 8-hour time window, 4, 12, and 24
+## Author: C.H.M. Maas
+
+clean environment
+```{r}
+rm(list = ls(all.names = TRUE))
+if(!is.null(dev.list())) dev.off()
+cat('\014')
+```
+
+```{r}
+install.packages("remotes")
+```
+
+
+```{r}
+time_horizon = 24
+```
+
+Make sure there are three folders: Code, Data, Results to read from and write to
+```{r}
+file.path <- "C:/Users/jenan/OneDrive - Tufts Medicine/code/EDSValidation_Jennie/"
+```
+
+Install PredictionTools: https://github.com/CHMMaas/PredictionTools
+```{r}
+remotes::install_github("CHMMaas/PredictionTools")
+```
+
+libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+library(PredictionTools)
+library(pROC)
+rmarkdown::render(paste0(file.path, "Code/HelperFunctions.Rmd"))
+```
+
+### Load data
+
+```{r}
+load(paste0(file.path, "Data/patient.data.RData"))
+```
+
+### Sensitivity Analysis: Sepsis-free Survival
+
+X-hour time window for patients with the outcome
+Negative patients: full hospitalization
+Positive patients: only those predictions X hours before sepsis onset
+```{r}
+patient.data.Xh <- patient.data |> 
+  group_by(LCSN) |> 
+  filter(sep3.outcome==0 | (sep3.outcome==1 & time.point >= max.time.point - time_horizon*4))
+```
+
+Aggregate data
+```{r}
+aggregated.data <- aggregate(patient.data.Xh, list(patient.data.Xh$LCSN), max)
+```
+
+
+```{r}
+final.thresholds <- c(20, 25, 30)
+
+subgroups <- c(
+  "All",
+  "Male",
+  "Female",
+  "Tufts",
+  "Melrose",
+  "Lowell",
+  paste("Younger than", young.age, "years"),
+  paste("Between", young.age, "and", old.age, "years"),
+  paste("Older than", old.age, "years"),
+  "White",
+  "Asian",
+  "Black",
+  "Other"
+)
+
+total.iterations <- length(final.thresholds) * length(subgroups)
+iteration <- 0
+
+results.list <- vector(
+  "list",
+  length = total.iterations
+)
+
+result.i <- 1
+
+# Progress bar
+pb <- txtProgressBar(
+  min = 0,
+  max = total.iterations,
+  style = 3
+)
+
+for (final.threshold in final.thresholds) {
+
+  for (subgroup in subgroups) {
+
+    # -----------------------------
+    # Select subgroup
+    # -----------------------------
+
+    if (subgroup == "All") {
+
+      data.subgroup <- aggregated.data
+
+    } else if (subgroup %in% c("Male", "Female")) {
+
+      data.subgroup <- aggregated.data |>
+        filter(sex == subgroup)
+
+    } else if (subgroup %in% c("Tufts", "Melrose", "Lowell")) {
+
+      data.subgroup <- aggregated.data |>
+        filter(center.grouped == subgroup)
+
+    } else if (
+      subgroup %in% c(
+        paste("Younger than", young.age, "years"),
+        paste("Between", young.age, "and", old.age, "years"),
+        paste("Older than", old.age, "years")
+      )
+    ) {
+
+      data.subgroup <- aggregated.data |>
+        filter(age.groups == subgroup)
+
+    } else if (
+      subgroup %in% c(
+        "White",
+        "Asian",
+        "Black",
+        "Other",
+        "Unknown"
+      )
+    ) {
+
+      data.subgroup <- aggregated.data |>
+        filter(race.groups == subgroup)
+
+    } else {
+
+      data.subgroup <- aggregated.data[0, ]
+    }
+
+    # -----------------------------
+    # Remove missing model scores
+    # and create binary prediction
+    # -----------------------------
+
+    data.subgroup <- data.subgroup |>
+      filter(
+        !is.na(model.score)
+      ) |>
+      mutate(
+        binary.prediction = as.numeric(
+          model.score > final.threshold / 100
+        )
+      )
+
+    # -----------------------------
+    # Sample size
+    # -----------------------------
+
+    n <- nrow(data.subgroup)
+
+    lcsn.values <- unique(data.subgroup$LCSN)
+
+    LCSN_n <- length(lcsn.values)
+
+    events <- sum(
+      data.subgroup$sep3.outcome == 1,
+      na.rm = TRUE
+    )
+
+    # -----------------------------
+    # Initialize AUC results
+    # -----------------------------
+
+    auc.value <- NA_real_
+    auc.lower <- NA_real_
+    auc.upper <- NA_real_
+
+    # -----------------------------
+    # Check whether AUC can be
+    # calculated
+    # -----------------------------
+
+    valid.auc <- (
+      n > 0 &&
+      LCSN_n > 1 &&
+      length(unique(
+        na.omit(data.subgroup$sep3.outcome)
+      )) == 2 &&
+      length(unique(
+        na.omit(data.subgroup$binary.prediction)
+      )) == 2
+    )
+
+    # -----------------------------
+    # Calculate AUC and 95% CI
+    # -----------------------------
+
+    if (valid.auc) {
+
+      roc.object <- pROC::roc(
+        response = data.subgroup$sep3.outcome,
+        predictor = data.subgroup$binary.prediction,
+        direction = "<",
+        quiet = TRUE
+      )
+
+      # AUC
+      auc.value <- as.numeric(
+        pROC::auc(roc.object)
+      )
+
+      # 95% confidence interval
+      auc.ci <- pROC::ci.auc(
+        roc.object,
+        conf.level = 0.95
+      )
+
+      # Lower 95% CI
+      auc.lower <- as.numeric(
+        auc.ci[1]
+      )
+
+      # Upper 95% CI
+      auc.upper <- as.numeric(
+        auc.ci[3]
+      )
+    }
+
+    # -----------------------------
+    # Store results
+    # -----------------------------
+
+    results.list[[result.i]] <- data.frame(
+      threshold = final.threshold,
+      subgroup = subgroup,
+      n = n,
+      LCSN_n = LCSN_n,
+      events = events,
+      AUC = auc.value,
+      AUC_lower_95CI = auc.lower,
+      AUC_upper_95CI = auc.upper,
+      stringsAsFactors = FALSE
+    )
+
+    # -----------------------------
+    # Update progress bar
+    # -----------------------------
+
+    result.i <- result.i + 1
+
+    iteration <- iteration + 1
+
+    setTxtProgressBar(
+      pb,
+      iteration
+    )
+  }
+}
+
+close(pb)
+
+# -----------------------------
+# Combine all results
+# -----------------------------
+
+auc.results <- bind_rows(
+  results.list
+)
+
+# View results
+auc.results
+```
+
+```{r}
+auc.table <- auc.results |>
+  mutate(
+    threshold = paste0("AUC_", threshold),
+    AUC_formatted = sprintf(
+      "%.2f (%.2f, %.2f)",
+      AUC,
+      AUC_lower_95CI,
+      AUC_upper_95CI
+    )
+  ) |>
+  select(subgroup, threshold, AUC_formatted) |>
+  tidyr::pivot_wider(
+    names_from = threshold,
+    values_from = AUC_formatted
+  )
+
+auc.table
+```
+
+```{r}
+openxlsx::write.xlsx(
+  auc.table,
+  file = paste0(
+    file.path,
+    "Binarized AUCs/Binarized AUC by Subgroup - Time Horizon ",
+    time_horizon,
+    ".xlsx"
+  ),
+  rowNames = FALSE
+)
+```
