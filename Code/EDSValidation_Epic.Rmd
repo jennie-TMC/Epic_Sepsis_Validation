@@ -21,7 +21,7 @@ cat('\014')
 
 
 ```{r}
-time_horizon = 24
+time_horizon = 8
 ```
 
 Make sure there are three folders: Code, Data, Results to read from and write to
